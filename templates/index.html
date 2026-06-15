@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧠 MindGuide 私人心理老师</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; color: #333; }
+
+/* Layout */
+.app-container { display: flex; height: 100vh; }
+
+/* Sidebar */
+.sidebar { width: 280px; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); padding: 1.5rem; display: flex; flex-direction: column; border-right: 1px solid rgba(0,0,0,0.06); overflow-y: auto; }
+.sidebar h2 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+.sidebar .subtitle { font-size: 0.8rem; color: #888; margin-bottom: 1rem; }
+.sidebar-section { margin-bottom: 1rem; }
+.sidebar-section h4 { font-size: 0.85rem; color: #555; margin-bottom: 0.5rem; }
+
+.mode-select { display: flex; gap: 4px; }
+.mode-btn { flex: 1; padding: 6px 10px; border: 1px solid #ddd; background: white; border-radius: 8px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; }
+.mode-btn:hover { border-color: #667eea; }
+.mode-btn.active { background: #667eea; color: white; border-color: #667eea; }
+
+.school-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.school-btn { padding: 8px; border: 1px solid #ddd; background: white; border-radius: 8px; cursor: pointer; font-size: 0.8rem; text-align: center; transition: all 0.2s; }
+.school-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.school-btn.active { border-width: 2px; }
+
+.school-info { padding: 10px; border-radius: 12px; margin-top: 6px; font-size: 0.8rem; line-height: 1.5; }
+.school-info .sname { font-weight: 700; }
+.school-info .sstyle { font-size: 0.78rem; }
+.school-info score { font-size: 0.75rem; color: #666; }
+
+.api-section input { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.8rem; }
+.api-section input:focus { outline: none; border-color: #667eea; }
+.api-status { font-size: 0.75rem; margin-top: 4px; }
+.api-status.ok { color: #2e7d32; }
+.api-status.off { color: #999; }
+
+.stats { }
+.stat-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.8rem; border-bottom: 1px solid #f0f0f0; }
+.stat-item:last-child { border-bottom: none; }
+
+.reset-btn { width: 100%; padding: 10px; background: #667eea; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 0.85rem; margin-top: auto; transition: background 0.2s; }
+.reset-btn:hover { background: #5a6fd6; }
+
+.footer-note { font-size: 0.7rem; color: #aaa; text-align: center; margin-top: 1rem; line-height: 1.6; }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.tabs { display: flex; background: rgba(255,255,255,0.8); border-bottom: 1px solid #e0e0e0; }
+.tab-btn { padding: 12px 24px; border: none; background: none; cursor: pointer; font-size: 0.9rem; color: #888; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-btn:hover { color: #555; }
+.tab-btn.active { color: #667eea; border-bottom-color: #667eea; }
+.tab-content { flex: 1; overflow: hidden; }
+.tab-panel { display: none; height: 100%; }
+.tab-panel.active { display: flex; flex-direction: column; }
+
+/* Chat tab */
+#chat-area { flex: 1; overflow-y: auto; padding: 1rem 2rem; }
+.message { max-width: 80%; margin-bottom: 1rem; }
+.message.user { margin-left: auto; }
+.message.assistant { margin-right: auto; }
+.message .bubble { padding: 12px 16px; border-radius: 16px; line-height: 1.7; font-size: 0.9rem; }
+.message.user .bubble { background: #e3f2fd; border-bottom-right-radius: 4px; }
+.message.assistant .bubble { background: white; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.message .label { font-size: 0.75rem; color: #999; margin-bottom: 4px; }
+.message.user .label { text-align: right; }
+
+#chat-input-area { display: flex; gap: 8px; padding: 1rem 2rem; background: rgba(255,255,255,0.8); border-top: 1px solid #e0e0e0; }
+#chat-input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+#chat-input:focus { border-color: #667eea; }
+#send-btn { padding: 10px 24px; background: #667eea; color: white; border: none; border-radius: 24px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; white-space: nowrap; }
+#send-btn:hover { background: #5a6fd6; }
+#send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+/* SOUL tab */
+#soul-panel { padding: 2rem; overflow-y: auto; }
+.soul-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.soul-card { background: white; padding: 1.2rem; border-radius: 12px; }
+.soul-card h5 { margin-bottom: 0.5rem; font-size: 0.95rem; }
+.soul-card p { font-size: 0.85rem; color: #555; line-height: 1.6; }
+.soul-bar { height: 6px; background: #eee; border-radius: 4px; margin: 8px 0; overflow: hidden; }
+.soul-bar-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 4px; transition: width 0.5s; }
+
+/* Growth tab */
+#growth-panel { padding: 2rem; overflow-y: auto; }
+.growth-metrics { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+.metric-card { flex: 1; background: white; padding: 1rem; border-radius: 12px; text-align: center; }
+.metric-card .num { font-size: 1.5rem; font-weight: 700; color: #667eea; }
+.metric-card .label { font-size: 0.8rem; color: #888; margin-top: 4px; }
+.chart-container { background: white; padding: 1.2rem; border-radius: 12px; margin-bottom: 1rem; height: 280px; }
+
+/* Welcome */
+.welcome-msg { text-align: center; padding: 3rem 2rem; color: #888; }
+.welcome-msg .icon { font-size: 3rem; margin-bottom: 1rem; }
+.welcome-msg p { line-height: 1.8; }
+
+/* Loading */
+.loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #ddd; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 40vh; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <h2>🧠 MindGuide</h2>
+    <div class="subtitle">你的私人心理老师</div>
+
+    <div class="sidebar-section">
+      <h4>🎯 模式选择</h4>
+      <div class="mode-select">
+        <button class="mode-btn active" data-mode="💬 自由倾诉" onclick="setMode(this)">💬 自由倾诉</button>
+        <button class="mode-btn" data-mode="📚 心理学课堂" onclick="setMode(this)">📚 心理学课堂</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h4>🎨 选择流派</h4>
+      <div class="school-grid" id="school-grid"></div>
+      <div class="school-info" id="school-info"></div>
+    </div>
+
+    <div class="sidebar-section api-section">
+      <h4>🔗 AI 增强</h4>
+      <input type="password" id="api-key" placeholder="填入 DeepSeek API Key 启用AI" oninput="updateAPIStatus()">
+      <div class="api-status off" id="api-status">留空则使用心理学模板</div>
+    </div>
+
+    <div class="sidebar-section stats" id="stats-section">
+      <h4>📊 今日概况</h4>
+      <div id="stats-content">
+        <div class="stat-item"><span>开始对话后</span><span>这里会显示你的成长数据 ✨</span></div>
+      </div>
+    </div>
+
+    <button class="reset-btn" onclick="resetChat()">🔄 新对话</button>
+    <div class="footer-note">
+      ⚠️ 本应用为教育演示项目<br>不能替代专业心理咨询<br><strong>全国心理援助热线：400-161-9995</strong>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="chat" onclick="switchTab('chat')">💬 对话</button>
+      <button class="tab-btn" data-tab="soul" onclick="switchTab('soul')">🔍 SOUL 分析</button>
+      <button class="tab-btn" data-tab="growth" onclick="switchTab('growth')">📈 成长轨迹</button>
+    </div>
+
+    <div class="tab-content">
+      <!-- Chat Panel -->
+      <div class="tab-panel active" id="tab-chat">
+        <div id="chat-area">
+          <div class="welcome-msg" id="welcome-msg">
+            <div class="icon" id="welcome-icon">🌱</div>
+            <p id="welcome-text"><strong>人本主义老师</strong><br>欢迎你来到这里。无论你带来什么，这里都是一个安全的空间。</p>
+          </div>
+        </div>
+        <div id="chat-input-area">
+          <input type="text" id="chat-input" placeholder="说说你的想法、感受或想问的问题..." onkeydown="if(event.key==='Enter') sendMessage()">
+          <button id="send-btn" onclick="sendMessage()">发送 ✨</button>
+        </div>
+      </div>
+
+      <!-- SOUL Panel -->
+      <div class="tab-panel" id="tab-soul">
+        <div id="soul-panel">
+          <h3>🔍 SOUL 对话分析框架</h3>
+          <p style="color:#888;font-size:0.85rem;">每次对话后，系统会从四个层次分析交互</p>
+          <div class="soul-grid">
+            <div class="soul-card">
+              <h5>S - 情境感知</h5>
+              <div class="soul-bar"><div class="soul-bar-fill" style="width:0%"></div></div>
+              <p id="soul-s">开始对话后，这里会展示 SOUL 框架对每次交互的深度分析</p>
+            </div>
+            <div class="soul-card">
+              <h5>O - 专业观察</h5>
+              <div class="soul-bar"><div class="soul-bar-fill" style="width:0%"></div></div>
+              <p id="soul-o">—</p>
+            </div>
+            <div class="soul-card">
+              <h5>U - 共情理解</h5>
+              <div class="soul-bar"><div class="soul-bar-fill" style="width:0%"></div></div>
+              <p id="soul-u">—</p>
+            </div>
+            <div class="soul-card">
+              <h5>L - 学习成长</h5>
+              <div class="soul-bar"><div class="soul-bar-fill" style="width:0%"></div></div>
+              <p id="soul-l">—</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Growth Panel -->
+      <div class="tab-panel" id="tab-growth">
+        <div id="growth-panel">
+          <div class="growth-metrics" id="growth-metrics">
+            <div class="metric-card"><div class="num" id="g-chats">0</div><div class="label">💬 总对话次数</div></div>
+            <div class="metric-card"><div class="num" id="g-knowledge">0</div><div class="label">📚 学习知识点</div></div>
+            <div class="metric-card"><div class="num" id="g-emotion">—</div><div class="label">❤️ 平均情绪指数</div></div>
+          </div>
+          <div class="chart-container"><canvas id="emotion-chart"></canvas></div>
+          <div class="chart-container"><canvas id="radar-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 状态 ──
+const state = {
+  messages: [],
+  school: '人本主义',
+  mode: '💬 自由倾诉',
+  emotionLog: [],
+  knowledgePoints: new Set(),
+  chatCount: 0,
+  schools: {}
+};
+
+let emotionChart = null;
+let radarChart = null;
+
+// ── 初始化 ──
+async function init() {
+  try {
+    const resp = await fetch('/schools');
+    state.schools = await resp.json();
+    renderSchools();
+    updateSchoolInfo('人本主义');
+    updateWelcome();
+  } catch(e) {
+    console.error('Init error:', e);
+  }
+}
+
+function renderSchools() {
+  const grid = document.getElementById('school-grid');
+  const entries = Object.entries(state.schools);
+  grid.innerHTML = entries.map(([name, s]) =>
+    `<button class="school-btn" data-school="${name}" style="border-color:${name===state.school ? s.color : '#ddd'};color:${name===state.school ? s.color : '#333'}" onclick="setSchool('${name}')">${s.icon} ${name.split('(')[0].trim()}</button>`
+  ).join('');
+}
+
+function updateSchoolInfo(name) {
+  const s = state.schools[name];
+  if (!s) return;
+  const div = document.getElementById('school-info');
+  div.style.background = s.bg;
+  div.innerHTML = `<div class="sname" style="color:${s.color}">${s.icon} ${name}</div><div class="sstyle">${s.style}</div><div style="font-size:0.78rem;color:#666;margin-top:4px;">${s.core.slice(0, 50)}…</div>`;
+
+  // Update buttons
+  document.querySelectorAll('.school-btn').forEach(btn => {
+    btn.style.borderColor = btn.dataset.school === name ? s.color : '#ddd';
+    btn.style.color = btn.dataset.school === name ? s.color : '#333';
+  });
+}
+
+function updateWelcome() {
+  const s = state.schools[state.school];
+  if (!s) return;
+  document.getElementById('welcome-icon').textContent = s.icon;
+  document.getElementById('welcome-text').innerHTML = `<strong>${state.school}老师</strong><br>${s.opener}`;
+}
+
+// ── 流派切换 ──
+function setSchool(name) {
+  state.school = name;
+  updateSchoolInfo(name);
+  updateWelcome();
+}
+
+// ── 模式切换 ──
+function setMode(btn) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.mode = btn.dataset.mode;
+}
+
+// ── API Key ──
+function updateAPIStatus() {
+  const key = document.getElementById('api-key').value;
+  const status = document.getElementById('api-status');
+  if (key) {
+    status.className = 'api-status ok';
+    status.textContent = '✅ AI模式已启用';
+  } else {
+    status.className = 'api-status off';
+    status.textContent = '留空则使用心理学模板';
+  }
+}
+
+// ── 发送消息 ──
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = '发送中…';
+
+  // Add user message to UI
+  addMessage(text, 'user');
+  hideWelcome();
+  state.messages.push({role: 'user', content: text});
+
+  try {
+    const resp = await fetch('/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        message: text,
+        school: state.school,
+        mode: state.mode,
+        api_key: document.getElementById('api-key').value,
+        conversation: state.messages
+      })
+    });
+    const data = await resp.json();
+
+    if (data.error) {
+      addMessage('抱歉，出了点问题，请重试。', 'assistant');
+      sendBtn.disabled = false;
+      sendBtn.textContent = '发送 ✨';
+      return;
+    }
+
+    // Update state
+    state.messages = data.conversation;
+    state.chatCount = data.chat_count;
+
+    // Add assistant message to UI
+    addMessage(data.response, 'assistant', data.school, data.style, data.icon);
+    state.messages = data.conversation;
+
+    // Emotion log
+    const now = new Date();
+    state.emotionLog.push({time: now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0'), score: data.emotion_score});
+
+    // Knowledge points
+    if (data.knowledge_points) {
+      data.knowledge_points.forEach(t => state.knowledgePoints.add(t));
+    }
+
+    // Update SOUL
+    if (data.soul) {
+      document.getElementById('soul-s').textContent = data.soul.s;
+      document.getElementById('soul-o').textContent = data.soul.o;
+      document.getElementById('soul-u').textContent = data.soul.u;
+      document.getElementById('soul-l').textContent = data.soul.l;
+      document.querySelectorAll('#soul-panel .soul-bar-fill').forEach((bar, i) => {
+        const pcts = [80, 70, 85, 75];
+        bar.style.width = pcts[i] + '%';
+      });
+    }
+
+    // Update stats
+    updateStats();
+
+    // Update charts
+    updateCharts();
+
+  } catch(e) {
+    addMessage('网络连接失败，请检查服务器是否在运行。', 'assistant');
+  }
+
+  sendBtn.disabled = false;
+  sendBtn.textContent = '发送 ✨';
+  document.getElementById('chat-input').focus();
+}
+
+function addMessage(content, role, school, style, icon) {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+
+  let label = '';
+  if (role === 'user') {
+    label = '<div class="label">你</div>';
+  } else {
+    const ic = icon || '🌱';
+    const sc = school || state.school;
+    label = `<div class="label">${ic} ${sc}</div>`;
+  }
+
+  div.innerHTML = label + `<div class="bubble">${content.replace(/\n/g, '<br>')}</div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function hideWelcome() {
+  const wel = document.getElementById('welcome-msg');
+  if (wel) wel.style.display = 'none';
+}
+
+// ── 更新统计 ──
+function updateStats() {
+  const stats = document.getElementById('stats-content');
+  const avg = state.emotionLog.length > 0
+    ? (state.emotionLog.reduce((s, e) => s + e.score, 0) / state.emotionLog.length).toFixed(1)
+    : '—';
+  stats.innerHTML = `
+    <div class="stat-item"><span>平均情绪分</span><span>${avg}/10</span></div>
+    <div class="stat-item"><span>对话轮次</span><span>${state.chatCount}</span></div>
+    <div class="stat-item"><span>已学知识点</span><span>${state.knowledgePoints.size}</span></div>
+  `;
+
+  document.getElementById('g-chats').textContent = state.chatCount;
+  document.getElementById('g-knowledge').textContent = state.knowledgePoints.size;
+  document.getElementById('g-emotion').textContent = avg;
+}
+
+// ── 图表 ──
+function updateCharts() {
+  updateEmotionChart();
+  updateRadarChart();
+}
+
+function updateEmotionChart() {
+  const ctx = document.getElementById('emotion-chart').getContext('2d');
+  if (emotionChart) emotionChart.destroy();
+
+  const labels = state.emotionLog.map(e => e.time);
+  const scores = state.emotionLog.map(e => e.score);
+
+  if (labels.length === 0) {
+    emotionChart = new Chart(ctx, {
+      type: 'line',
+      data: {labels: ['对话1','对话2','对话3','对话4','对话5'], datasets: [{data: [5,5,5,5,5], borderColor: '#ccc', borderDash: [5,5], pointBackgroundColor: '#ccc'}]},
+      options: {responsive: true, maintainAspectRatio: false, plugins: {title: {display: true, text: '期待你的成长数据 ✨'}}, scales: {y: {min: 0, max: 10}}}
+    });
+    return;
+  }
+
+  emotionChart = new Chart(ctx, {
+    type: 'line',
+    data: {labels, datasets: [{label: '情绪评分', data: scores, borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.3, pointBackgroundColor: '#764ba2', pointRadius: 5}]},
+    options: {responsive: true, maintainAspectRatio: false, plugins: {title: {display: true, text: '情绪变化曲线'}}, scales: {y: {min: 0, max: 10, ticks: {stepSize: 1}}}}
+  });
+}
+
+function updateRadarChart() {
+  const ctx = document.getElementById('radar-chart').getContext('2d');
+  if (radarChart) radarChart.destroy();
+
+  const allTopics = ['焦虑', '压力', '人际关系', '自我成长', '情绪低落'];
+  const values = allTopics.map(t => state.knowledgePoints.has(t) ? 10 : 0);
+
+  radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {labels: allTopics, datasets: [{label: '知识覆盖', data: values, backgroundColor: 'rgba(102,126,234,0.2)', borderColor: '#667eea', pointBackgroundColor: '#667eea', pointRadius: 5}]},
+    options: {responsive: true, maintainAspectRatio: false, plugins: {title: {display: true, text: '知识覆盖雷达图'}}, scales: {r: {min: 0, max: 10, ticks: {stepSize: 2}}}}
+  });
+}
+
+// ── 新对话 ──
+function resetChat() {
+  if (!confirm('确定要清空当前对话吗？')) return;
+  state.messages = [];
+  state.emotionLog = [];
+  state.knowledgePoints = new Set();
+  state.chatCount = 0;
+
+  document.getElementById('chat-area').innerHTML = '';
+  updateWelcome();
+  document.getElementById('welcome-msg').style.display = 'block';
+
+  // Reset SOUL
+  ['soul-s','soul-o','soul-u','soul-l'].forEach(id => {
+    if (id === 'soul-s') document.getElementById(id).textContent = '开始对话后，这里会展示 SOUL 框架对每次交互的深度分析';
+    else document.getElementById(id).textContent = '—';
+  });
+  document.querySelectorAll('#soul-panel .soul-bar-fill').forEach(b => b.style.width = '0%');
+
+  // Reset stats
+  updateStats();
+  updateCharts();
+}
+
+// ── Tab 切换 ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  if (tab === 'growth') updateCharts();
+}
+
+// ── 启动 ──
+init();
+</script>
+</body>
+</html>
